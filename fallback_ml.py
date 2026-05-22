@@ -28,6 +28,33 @@ def train_fallback_model(df, target_col='dropout_label', exclude_cols=None):
     
     print(f"[INFO] Training local fallback HistGradientBoosting model on {X.shape[0]} rows and {X.shape[1]} features...")
     
+    # Calculate and print validation metrics on an 80/20 train-test split
+    try:
+        from sklearn.model_selection import train_test_split
+        from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, precision_score, recall_score
+        
+        X_tr, X_te, y_tr, y_te = train_test_split(X, y, test_size=0.20, random_state=42, stratify=y)
+        eval_model = HistGradientBoostingClassifier(
+            max_iter=100, 
+            max_depth=5, 
+            learning_rate=0.1,
+            random_state=42
+        )
+        eval_model.fit(X_tr, y_tr)
+        
+        eval_preds = eval_model.predict(X_te)
+        eval_probas = eval_model.predict_proba(X_te)[:, 1]
+        
+        print("\n=== FALLBACK MODEL METRICS (80/20 Stratified Validation) ===")
+        print(f"Accuracy:  {accuracy_score(y_te, eval_preds):.4f}")
+        print(f"ROC-AUC:   {roc_auc_score(y_te, eval_probas):.4f}")
+        print(f"F1-Macro:  {f1_score(y_te, eval_preds, average='macro'):.4f}")
+        print(f"Precision: {precision_score(y_te, eval_preds):.4f}")
+        print(f"Recall:    {recall_score(y_te, eval_preds):.4f}")
+        print("============================================================\n")
+    except Exception as eval_err:
+        print(f"[WARN] Could not calculate validation metrics: {eval_err}")
+    
     # We use HistGradientBoostingClassifier since XGBoost fails on Mac without libomp
     _model = HistGradientBoostingClassifier(
         max_iter=100, 
